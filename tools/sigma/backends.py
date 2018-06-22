@@ -1203,3 +1203,41 @@ class QualysBackend(SingleTextQueryBackend):
                 raise FullMatchError(query)
             else:
                 self.output.print(query)
+
+class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
+    """Elastalert backend"""
+    identifier = 'elastalert'
+    active = True
+    output_class = SingleOutput
+    #options = (
+    #    ("alert", "alert:", "alert section", None)
+    #)
+    interval = None
+    title = None
+
+    def generate(self, sigmaparser):
+        # get the details if this alert occurs
+        elasticsearc_qs = super().generate(sigmaparser)
+        rulename = self.getRuleName(sigmaparser)
+        title = sigmaparser.parsedyaml.setdefault("title", "")
+        description = sigmaparser.parsedyaml.setdefault("description", "")
+        false_positives = sigmaparser.parsedyaml.setdefault("falsepositives", "")
+        level = sigmaparser.parsedyaml.setdefault("level", "")
+        # Get time frame if exists
+        interval = sigmaparser.parsedyaml["detection"].setdefault("timeframe", "30m")
+            
+        # creating condition
+        indices = sigmaparser.get_logsource().index
+#
+#    #def generateQuery(self, parsed):
+#    #    self.output.print(self.generateNode(parsed.parsedSearch))
+#    #    if parsed.parsedAgg:
+#    #        self.generateAggregation(parsed.parsedAgg)
+#
+#    ##def generateAggregation(self, agg):
+    #    
+
+    #def finalize(self):
+    #    self.output.print(json.dumps(self.queries, indent=2))
+
+
