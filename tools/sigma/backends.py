@@ -18,6 +18,7 @@ import sys
 import json
 import re
 import sigma
+import yaml
 
 def getBackendList():
     """Return list of backend classes"""
@@ -1175,6 +1176,14 @@ def flatten(l):
       else:
           yield i
 
+def convertLevel(level):
+    return {
+        'critical': 1,
+        'high': 2,
+        'medium': 3,
+        'low': 4
+    }.get(level, 2)
+
 # Exceptions
 class BackendError(Exception):
     """Base exception for backend-specific errors."""
@@ -1420,9 +1429,11 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
     interval = None
     title = None
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.elastalert_alerts = dict()
+
     def generate(self, sigmaparser):
-        # get the details if this alert occurs
-        elasticsearc_qs = super().generate(sigmaparser)
         rulename = self.getRuleName(sigmaparser)
         title = sigmaparser.parsedyaml.setdefault("title", "")
         description = sigmaparser.parsedyaml.setdefault("description", "")
@@ -1430,19 +1441,69 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
         level = sigmaparser.parsedyaml.setdefault("level", "")
         # Get time frame if exists
         interval = sigmaparser.parsedyaml["detection"].setdefault("timeframe", "30m")
-            
         # creating condition
-        indices = sigmaparser.get_logsource().index
-#
-#    #def generateQuery(self, parsed):
-#    #    self.output.print(self.generateNode(parsed.parsedSearch))
-#    #    if parsed.parsedAgg:
-#    #        self.generateAggregation(parsed.parsedAgg)
-#
-#    ##def generateAggregation(self, agg):
-    #    
+        index = sigmaparser.get_logsource().index
+        #Init a rule number cpt in case there are several elastalert rules generated fron one Sigma rule
+        rule_number = 0
+        for parsed in sigmaparser.condparsed:
+            rule_object = {
+                "name": rulename + "_" + str(rule_number),
+                "description": description,
+                "index": index,
+                "priority": convertLevel(level)
+            }
+            rule_object['filter'] = self.generateQuery(parsed)
+            #Handle timeframe
+            
+            if parsed.parsedAgg:
+                if parsed.parsedAgg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_COUNT or parsed.parsedAgg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_MIN or parsed.parsedAgg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_MAX or parsed.parsedAgg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_AVG or parsed.parsedAgg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_SUM:
+                    rule_object['query_key'] = parsed.parsedAgg.groupfield
+                    rule_object['type'] = "metric_aggregation"
+                    rule_object['cardinality_field'] = parsed.parsedAgg.aggfield
+                    rule_object['buffer_time'] = interval
 
-    #def finalize(self):
-    #    self.output.print(json.dumps(self.queries, indent=2))
+                    if parsed.parsedAgg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_COUNT:
+                        rule_object['metric_agg_type'] = "cardinality"
+                    else:
+                        rule_object['metric_agg_type'] = agg.aggfunc_notrans
 
+                    condition_value = int(parsed.parsedAgg.condition)
+                    if parsed.parsedAgg.cond_op == ">":
+                        rule_object['max_threshold'] = condition_value
+                    elif parsed.parsedAgg.cond_op == ">=":
+                        rule_object['max_threshold'] = condition_value - 1
+                    elif parsed.parsedAgg.cond_op == "<":
+                        rule_object['min_threshold'] = condition_value
+                    elif parsed.parsedAgg.cond_op == "<=":
+                        rule_object['min_threshold'] = condition_value - 1
+                    else: # = case must be tested
+                        rule_object['max_threshold'] = condition_value - 1
+                        rule_object['min_threshold'] = condition_value + 1
 
+            #Handle alert action
+            #Increment rule number
+            rule_number += 1
+            self.elastalert_alerts[rule_object['name']] = rule_object
+            self.output.print(rule_object)
+        
+
+    def generateQuery(self, parsed):
+        #Generate ES QS Query
+        return { 'query' : { 'query_string' : { 'query' : super().generateQuery(parsed) } } }
+
+    def generateAggregation(self, agg):
+        if agg:
+            if agg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_COUNT or agg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_MIN or agg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_MAX or agg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_AVG or agg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_SUM:
+                return ""
+            else:
+                for name, idx in agg.aggfuncmap.items():
+                    if idx == agg.aggfunc:
+                        funcname = name
+                        break
+                raise NotImplementedError("%s : The '%s' aggregation operator is not yet implemented for this backend"%(self.title, funcname)) 
+
+    def finalize(self):
+        for rulename, rule in self.elastalert_alerts.items():
+            self.output.print(rulename + "\n")
+            self.output.print(yaml.dump(rule, default_flow_style=False))
+            self.output.print(rulename + "\n")
