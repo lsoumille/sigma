@@ -1423,9 +1423,10 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
     identifier = 'elastalert'
     active = True
     output_class = SingleOutput
-    #options = (
-    #    ("alert", "alert:", "alert section", None)
-    #)
+    options = (
+        ("email", None, "Email address for Elastalert notification", None),
+        ("output", "curl", "Output format: curl = Shell script that imports queries in Watcher index with curl", "output_type"),
+    )
     interval = None
     title = None
 
@@ -1446,6 +1447,7 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
         #Init a rule number cpt in case there are several elastalert rules generated fron one Sigma rule
         rule_number = 0
         for parsed in sigmaparser.condparsed:
+            #Static data
             rule_object = {
                 "name": rulename + "_" + str(rule_number),
                 "description": description,
@@ -1453,19 +1455,24 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
                 "priority": convertLevel(level)
             }
             rule_object['filter'] = self.generateQuery(parsed)
-            #Handle timeframe
-            
+
+            #Handle aggregation
             if parsed.parsedAgg:
                 if parsed.parsedAgg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_COUNT or parsed.parsedAgg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_MIN or parsed.parsedAgg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_MAX or parsed.parsedAgg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_AVG or parsed.parsedAgg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_SUM:
                     rule_object['query_key'] = parsed.parsedAgg.groupfield
                     rule_object['type'] = "metric_aggregation"
-                    rule_object['cardinality_field'] = parsed.parsedAgg.aggfield
                     rule_object['buffer_time'] = interval
+                    rule_object['doc_type'] = "_doc"
 
                     if parsed.parsedAgg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_COUNT:
                         rule_object['metric_agg_type'] = "cardinality"
                     else:
-                        rule_object['metric_agg_type'] = agg.aggfunc_notrans
+                        rule_object['metric_agg_type'] = parsed.parsedAgg.aggfunc_notrans
+
+                    if parsed.parsedAgg.aggfield:
+                        rule_object['metric_agg_key'] = parsed.parsedAgg.aggfield
+                    else:
+                        rule_object['metric_agg_key'] = "_id"
 
                     condition_value = int(parsed.parsedAgg.condition)
                     if parsed.parsedAgg.cond_op == ">":
@@ -1481,6 +1488,12 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
                         rule_object['min_threshold'] = condition_value + 1
 
             #Handle alert action
+            if self.email:
+                rule_object['alert'] = ['email']
+                rule_object['email'] = self.email
+            else:
+                rule_object['alert'] = ['debug']
+
             #Increment rule number
             rule_number += 1
             self.elastalert_alerts[rule_object['name']] = rule_object
