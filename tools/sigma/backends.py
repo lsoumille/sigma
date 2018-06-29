@@ -1444,6 +1444,10 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
         interval = sigmaparser.parsedyaml["detection"].setdefault("timeframe", "30m")
         # creating condition
         index = sigmaparser.get_logsource().index
+        if len(index) == 0:   # fallback if no index is given
+            index = "logstash-*"
+        elif len(index) > 0:
+        	index = index[0]
         #Init a rule number cpt in case there are several elastalert rules generated fron one Sigma rule
         rule_number = 0
         for parsed in sigmaparser.condparsed:
