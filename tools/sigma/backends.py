@@ -1425,10 +1425,13 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
     output_class = SingleOutput
     options = (
         ("email", None, "Email address for Elastalert notification", None),
-        ("output", "curl", "Output format: curl = Shell script that imports queries in Watcher index with curl", "output_type"),
+        ("slack", None, "Output format: curl = Shell script that imports queries in Watcher index with curl", None),
+        ("command_path", None, "Output format: curl = Shell script that imports queries in Watcher index with curl", None)
     )
     interval = None
     title = None
+    #Script path, rule name, priority and code must be added according to the rule
+    command_constant = [ "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "& \'%s\' -Timestamp {match[@timestamp]} -Code %s -Rule \'%s\' -Priority %s" ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1440,6 +1443,7 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
         description = sigmaparser.parsedyaml.setdefault("description", "")
         false_positives = sigmaparser.parsedyaml.setdefault("falsepositives", "")
         level = sigmaparser.parsedyaml.setdefault("level", "")
+        rule_tag = sigmaparser.parsedyaml.setdefault("tags", "NOT-DEF")
         # Get time frame if exists
         interval = self.generateTimeframe(sigmaparser.parsedyaml["detection"].setdefault("timeframe", "30m"))
         # creating condition
@@ -1495,7 +1499,16 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
             if self.email:
                 rule_object['alert'] = ['email']
                 rule_object['email'] = self.email
-            else:
+            if self.command_path:
+            	rule_object['alert'] = ['command']
+            	rule_object['new_style_string_format'] = True
+            	rule_object['pipe_match_json'] = True
+            	command_array = []
+            	command_array.append(self.command_constant[0])
+            	command_array.append(self.command_constant[1] % (self.command_path, rule_tag, rule_object['name'], rule_object['priority']))
+            	rule_object['command'] = command_array
+            #If alert is not define put debug as default
+            if not hasattr(rule_object, 'alert'):
                 rule_object['alert'] = ['debug']
 
             #Increment rule number
@@ -1506,7 +1519,7 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
 
     def generateQuery(self, parsed):
         #Generate ES QS Query
-        return { 'query' : { 'query_string' : { 'query' : super().generateQuery(parsed) } } }
+        return [{ 'query' : { 'query_string' : { 'query' : super().generateQuery(parsed) } } }]
 
     def generateTimeframe(self, timeframe):
     	time_unit = timeframe[-1:]
@@ -1537,6 +1550,4 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
 
     def finalize(self):
         for rulename, rule in self.elastalert_alerts.items():
-            self.output.print(rulename + "\n")
             self.output.print(yaml.dump(rule, default_flow_style=False))
-            self.output.print(rulename + "\n")
