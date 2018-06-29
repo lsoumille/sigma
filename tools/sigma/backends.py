@@ -1441,7 +1441,7 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
         false_positives = sigmaparser.parsedyaml.setdefault("falsepositives", "")
         level = sigmaparser.parsedyaml.setdefault("level", "")
         # Get time frame if exists
-        interval = sigmaparser.parsedyaml["detection"].setdefault("timeframe", "30m")
+        interval = self.generateTimeframe(sigmaparser.parsedyaml["detection"].setdefault("timeframe", "30m"))
         # creating condition
         index = sigmaparser.get_logsource().index
         if len(index) == 0:   # fallback if no index is given
@@ -1507,6 +1507,22 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
     def generateQuery(self, parsed):
         #Generate ES QS Query
         return { 'query' : { 'query_string' : { 'query' : super().generateQuery(parsed) } } }
+
+    def generateTimeframe(self, timeframe):
+    	time_unit = timeframe[-1:]
+    	duration = timeframe[:-1]
+    	timeframe_object = {}
+    	if time_unit == "s":
+    		timeframe_object['seconds'] = int(duration)
+    	elif time_unit == "m":
+    		timeframe_object['minutes'] = int(duration)
+    	elif time_unit == "h":
+    		timeframe_object['hours'] = int(duration)
+    	elif time_unit == "d":
+    		timeframe_object['days'] = int(duration)
+    	else:
+    		timeframe_object['months'] = int(duration)
+    	return timeframe_object
 
     def generateAggregation(self, agg):
         if agg:
