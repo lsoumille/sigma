@@ -1425,7 +1425,7 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
     output_class = SingleOutput
     options = (
         ("email", None, "Email address for Elastalert notification", None),
-        ("slack", None, "Output format: curl = Shell script that imports queries in Watcher index with curl", None),
+        ("slack_url", None, "Slack webhook URL", None),
         ("command_path", None, "Output format: curl = Shell script that imports queries in Watcher index with curl", None)
     )
     interval = None
@@ -1496,20 +1496,24 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
                         rule_object['min_threshold'] = condition_value + 1
 
             #Handle alert action
+            rule_object['alert'] = []
             if self.email:
-                rule_object['alert'] = ['email']
+                rule_object['alert'].append('email')
                 rule_object['email'] = self.email
             if self.command_path:
-            	rule_object['alert'] = ['command']
+            	rule_object['alert'].append('command')
             	rule_object['new_style_string_format'] = True
             	rule_object['pipe_match_json'] = True
             	command_array = []
             	command_array.append(self.command_constant[0])
             	command_array.append(self.command_constant[1] % (self.command_path, rule_tag, rule_object['name'], rule_object['priority']))
             	rule_object['command'] = command_array
+            if self.slack_url:
+                rule_object['alert'].append('slack')
+                rule_object['slack_webhook_url'] = [ self.slack_url ]
             #If alert is not define put debug as default
-            if not hasattr(rule_object, 'alert'):
-                rule_object['alert'] = ['debug']
+            if len(rule_object['alert']) == 0:
+                rule_object['alert'].append('debug')
 
             #Increment rule number
             rule_number += 1
