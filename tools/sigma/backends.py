@@ -1426,7 +1426,9 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
     options = (
         ("email", None, "Email address for Elastalert notification", None),
         ("slack_url", None, "Slack webhook URL", None),
-        ("command_path", None, "Output format: curl = Shell script that imports queries in Watcher index with curl", None)
+        ("command_path", None, "Output format: curl = Shell script that imports queries in Watcher index with curl", None),
+        ("realert_time", "15m", "Ignore repeating alerts for a period of time", None),
+        ("expo_realert_time", "60m", "This option causes the value of realert to exponentially increase while alerts continue to fire", None)
     )
     interval = None
     title = None
@@ -1460,7 +1462,9 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
                 "name": rulename + "_" + str(rule_number),
                 "description": description,
                 "index": index,
-                "priority": convertLevel(level)
+                "priority": convertLevel(level),
+                "realert": self.generateTimeframe(self.realert_time),
+                "exponential_realert": self.generateTimeframe(self.expo_realert_time)
             }
             rule_object['filter'] = self.generateQuery(parsed)
 
@@ -1470,7 +1474,7 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
                     rule_object['query_key'] = parsed.parsedAgg.groupfield
                     rule_object['type'] = "metric_aggregation"
                     rule_object['buffer_time'] = interval
-                    rule_object['doc_type'] = "_doc"
+                    rule_object['doc_type'] = "doc"
 
                     if parsed.parsedAgg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_COUNT:
                         rule_object['metric_agg_type'] = "cardinality"
