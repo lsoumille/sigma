@@ -1424,9 +1424,15 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
     active = True
     output_class = SingleOutput
     options = (
-        ("email", None, "Email address for Elastalert notification", None),
-        ("slack_url", None, "Slack webhook URL", None),
-        ("command_path", None, "Output format: curl = Shell script that imports queries in Watcher index with curl", None),
+        ("emails", None, "Email addresses for Elastalert notification, if you want to alert several email addresses put them coma separated", None),
+        ("smtp_host", None, "SMTP server address", None),
+        ("from_addr", None, "Email sender address", None),
+        ("smtp_auth_file", None, "Local path with login info", None),
+        ("slack_urls", None, "Slack webhook URLs, if you want to alert several Slack channel put them coma separated", None),
+        ("command_path", None, "Script path to execute", None),
+        ("alert_text_type", None, "Alert output format", None),
+        ("alert_text", None, "Alert text output", None),
+        ("alert_text_args", None, "Fields to put in alerts (coma separated", None),
         ("realert_time", "15m", "Ignore repeating alerts for a period of time", None),
         ("expo_realert_time", "60m", "This option causes the value of realert to exponentially increase while alerts continue to fire", None)
     )
@@ -1501,9 +1507,17 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
 
             #Handle alert action
             rule_object['alert'] = []
-            if self.email:
+            if self.emails:
                 rule_object['alert'].append('email')
-                rule_object['email'] = self.email
+                rule_object['email'] = []
+                for address in self.emails.split(','):
+                    rule_object['email'].append(address)
+                if self.smtp_host:
+                    rule_object['smtp_host'] = self.smtp_host
+                if self.from_addr:
+                    rule_object['from_addr'] = self.from_addr
+                if self.smtp_auth_file:
+                    rule_object['smtp_auth_file'] = self.smtp_auth_file
             if self.command_path:
             	rule_object['alert'].append('command')
             	rule_object['new_style_string_format'] = True
@@ -1512,9 +1526,19 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
             	command_array.append(self.command_constant[0])
             	command_array.append(self.command_constant[1] % (self.command_path, rule_tag, rule_object['name'], rule_object['priority']))
             	rule_object['command'] = command_array
-            if self.slack_url:
+            if self.slack_urls:
                 rule_object['alert'].append('slack')
-                rule_object['slack_webhook_url'] = [ self.slack_url ]
+                rule_object['slack_webhook_url'] = []
+                for url in self.slack_urls.split(','):
+                    rule_object['slack_webhook_url'].append(url)
+            if self.alert_text_type:
+                rule_object['alert_text_type'] = self.alert_text_type
+            if self.alert_text:
+                rule_object['alert_text'] = self.alert_text
+            if self.alert_text_args:
+                rule_object['alert_text_args'] = []
+                for arg in self.alert_text_args.split(','):
+                    rule_object['alert_text_args'].append(arg)
             #If alert is not define put debug as default
             if len(rule_object['alert']) == 0:
                 rule_object['alert'].append('debug')
@@ -1522,8 +1546,6 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
             #Increment rule number
             rule_number += 1
             self.elastalert_alerts[rule_object['name']] = rule_object
-            self.output.print(rule_object)
-        
 
     def generateQuery(self, parsed):
         #Generate ES QS Query
