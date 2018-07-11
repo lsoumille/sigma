@@ -1570,6 +1570,8 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
                     else: # = case must be tested
                         rule_object['max_threshold'] = condition_value - 1
                         rule_object['min_threshold'] = condition_value + 1
+            else:
+                rule_object['type'] = "any"
 
             #Handle alert action
             rule_object['alert'] = []
