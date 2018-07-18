@@ -12,4 +12,5 @@ logsources:
 fieldmappings:
     client_ip: clientip
     url: request
+    EventID: test
 defaultindex: logstash-*
