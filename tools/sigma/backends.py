@@ -1517,7 +1517,7 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
         description = sigmaparser.parsedyaml.setdefault("description", "")
         false_positives = sigmaparser.parsedyaml.setdefault("falsepositives", "")
         level = sigmaparser.parsedyaml.setdefault("level", "")
-        rule_tag = sigmaparser.parsedyaml.setdefault("tags", "NOT-DEF")
+        rule_tag = sigmaparser.parsedyaml.setdefault("tags", ["NOT-DEF"])
         # Get time frame if exists
         interval = self.generateTimeframe(sigmaparser.parsedyaml["detection"].setdefault("timeframe", "30m"))
         # creating condition
@@ -1592,7 +1592,7 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
             	rule_object['pipe_match_json'] = True
             	command_array = []
             	command_array.append(self.command_constant[0])
-            	command_array.append(self.command_constant[1] % (self.command_path, rule_tag, rule_object['name'], rule_object['priority']))
+            	command_array.append(self.command_constant[1] % (self.command_path, rule_tag[0], rule_object['name'], rule_object['priority']))
             	rule_object['command'] = command_array
             if self.slack_urls:
                 rule_object['alert'].append('slack')
