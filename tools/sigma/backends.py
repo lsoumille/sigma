@@ -1510,6 +1510,7 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.elastalert_alerts = dict()
+        self.fields = []
 
     def generate(self, sigmaparser):
         rulename = self.getRuleName(sigmaparser)
@@ -1535,8 +1536,8 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
                 "description": description,
                 "index": index,
                 "priority": convertLevel(level),
-                "realert": self.generateTimeframe(self.realert_time),
-                "exponential_realert": self.generateTimeframe(self.expo_realert_time)
+                #"realert": self.generateTimeframe(self.realert_time),
+                #"exponential_realert": self.generateTimeframe(self.expo_realert_time)
             }
             rule_object['filter'] = self.generateQuery(parsed)
 
@@ -1572,6 +1573,8 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
                         rule_object['min_threshold'] = condition_value + 1
             else:
                 rule_object['type'] = "any"
+                #rule_object['query_key'] = ",".join(list(set(self.fields)))
+
 
             #Handle alert action
             rule_object['alert'] = []
@@ -1614,10 +1617,19 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
             #Increment rule number
             rule_number += 1
             self.elastalert_alerts[rule_object['name']] = rule_object
+            #Clear fields
+            self.fields = []
 
     def generateQuery(self, parsed):
         #Generate ES QS Query
         return [{ 'query' : { 'query_string' : { 'query' : super().generateQuery(parsed) } } }]
+
+    def generateNode(self, node):
+        #Save fields for adding them in query_key
+        #if type(node) == sigma.parser.NodeSubexpression:
+        #    for k,v in node.items.items:
+        #        self.fields.append(k)
+        return super().generateNode(node)
 
     def generateTimeframe(self, timeframe):
     	time_unit = timeframe[-1:]
