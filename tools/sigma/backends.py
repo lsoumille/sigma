@@ -1499,7 +1499,7 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
         ("alert_text_type", None, "Alert output format", None),
         ("alert_text", None, "Alert text output", None),
         ("alert_text_args", None, "Fields to put in alerts (coma separated", None),
-        ("realert_time", "15m", "Ignore repeating alerts for a period of time", None),
+        ("realert_time", "0m", "Ignore repeating alerts for a period of time", None),
         ("expo_realert_time", "60m", "This option causes the value of realert to exponentially increase while alerts continue to fire", None)
     )
     interval = None
@@ -1536,7 +1536,7 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
                 "description": description,
                 "index": index,
                 "priority": convertLevel(level),
-                #"realert": self.generateTimeframe(self.realert_time),
+                "realert": self.generateTimeframe(self.realert_time),
                 #"exponential_realert": self.generateTimeframe(self.expo_realert_time)
             }
             rule_object['filter'] = self.generateQuery(parsed)
