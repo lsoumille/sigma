@@ -556,13 +556,13 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
 
             #Handle aggregation
             if parsed.parsedAgg:
-                if parsed.parsedAgg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_COUNT or parsed.parsedAgg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_MIN or parsed.parsedAgg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_MAX or parsed.parsedAgg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_AVG or parsed.parsedAgg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_SUM:
+                if parsed.parsedAgg.aggfunc == sigma.parser.condition.SigmaAggregationParser.AGGFUNC_COUNT or parsed.parsedAgg.aggfunc == sigma.parser.condition.SigmaAggregationParser.AGGFUNC_MIN or parsed.parsedAgg.aggfunc == sigma.parser.condition.SigmaAggregationParser.AGGFUNC_MAX or parsed.parsedAgg.aggfunc == sigma.parser.condition.SigmaAggregationParser.AGGFUNC_AVG or parsed.parsedAgg.aggfunc == sigma.parser.condition.SigmaAggregationParser.AGGFUNC_SUM:
                     rule_object['query_key'] = parsed.parsedAgg.groupfield
                     rule_object['type'] = "metric_aggregation"
                     rule_object['buffer_time'] = interval
                     rule_object['doc_type'] = "doc"
 
-                    if parsed.parsedAgg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_COUNT:
+                    if parsed.parsedAgg.aggfunc == sigma.parser.condition.SigmaAggregationParser.AGGFUNC_COUNT:
                         rule_object['metric_agg_type'] = "cardinality"
                     else:
                         rule_object['metric_agg_type'] = parsed.parsedAgg.aggfunc_notrans
@@ -662,7 +662,7 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
 
     def generateAggregation(self, agg):
         if agg:
-            if agg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_COUNT or agg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_MIN or agg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_MAX or agg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_AVG or agg.aggfunc == sigma.parser.SigmaAggregationParser.AGGFUNC_SUM:
+            if agg.aggfunc == sigma.parser.condition.SigmaAggregationParser.AGGFUNC_COUNT or agg.aggfunc == sigma.parser.condition.SigmaAggregationParser.AGGFUNC_MIN or agg.aggfunc == sigma.parser.condition.SigmaAggregationParser.AGGFUNC_MAX or agg.aggfunc == sigma.parser.condition.SigmaAggregationParser.AGGFUNC_AVG or agg.aggfunc == sigma.parser.condition.SigmaAggregationParser.AGGFUNC_SUM:
                 return ""
             else:
                 for name, idx in agg.aggfuncmap.items():
