@@ -85,3 +85,11 @@ def flatten(l):
           yield from flatten(i)
       else:
           yield i
+
+def convertLevel(level):
+    return {
+        'critical': 1,
+        'high': 2,
+        'medium': 3,
+        'low': 4
+    }.get(level, 2)
