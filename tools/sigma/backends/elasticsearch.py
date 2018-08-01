@@ -518,7 +518,7 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
     interval = None
     title = None
     #Script path, rule name, priority and code must be added according to the rule
-    command_constant = [ "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "& \'%s\' -Timestamp %(@timestamp)s -Code %s -Rule \'%s\' -Priority %s" ]
+    command_constant = [ "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "& \'{}\' -Timestamp %(@timestamp)s -Code {} -Rule \'{}\' -Priority {}" ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -608,7 +608,7 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
                 rule_object['pipe_match_json'] = True
                 command_array = []
                 command_array.append(self.command_constant[0])
-                command_array.append(self.command_constant[1] % (self.command_path, rule_tag[0], rule_object['name'], rule_object['priority']))
+                command_array.append(self.command_constant[1].format(self.command_path, rule_tag[0], rule_object['name'], rule_object['priority']))
                 rule_object['command'] = command_array
             if self.slack_urls:
                 rule_object['alert'].append('slack')
