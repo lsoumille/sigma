@@ -518,7 +518,7 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
     interval = None
     title = None
     #Script path, rule name, priority and code must be added according to the rule
-    command_constant = [ "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "& \'%s\' -Timestamp {match[@timestamp]} -Code %s -Rule \'%s\' -Priority %s" ]
+    command_constant = [ "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "& \'%s\' -Timestamp %(@timestamp)s -Code %s -Rule \'%s\' -Priority %s" ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -604,7 +604,7 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
                     rule_object['smtp_auth_file'] = self.smtp_auth_file
             if self.command_path:
                 rule_object['alert'].append('command')
-                rule_object['new_style_string_format'] = True
+                rule_object['new_style_string_format'] = False
                 rule_object['pipe_match_json'] = True
                 command_array = []
                 command_array.append(self.command_constant[0])
