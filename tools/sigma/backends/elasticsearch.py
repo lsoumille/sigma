@@ -668,4 +668,5 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
         result = ""
         for rulename, rule in self.elastalert_alerts.items():
             result += yaml.dump(rule, default_flow_style=False)
+            result += '\n'
         return result
