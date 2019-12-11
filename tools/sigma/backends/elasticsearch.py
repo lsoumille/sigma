@@ -553,7 +553,8 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
                     rule_object['query_key'] = parsed.parsedAgg.groupfield
                     rule_object['type'] = "metric_aggregation"
                     rule_object['buffer_time'] = interval
-                    rule_object['doc_type'] = "doc"
+                    rule_object['realert'] = interval
+                    #rule_object['doc_type'] = "doc"
 
                     if parsed.parsedAgg.aggfunc == sigma.parser.condition.SigmaAggregationParser.AGGFUNC_COUNT:
                         rule_object['metric_agg_type'] = "cardinality"
@@ -666,7 +667,9 @@ class ElastalertBackend(MultiRuleOutputMixin, ElasticsearchQuerystringBackend):
 
     def finalize(self):
         result = ""
+        noalias_dumper = yaml.dumper.SafeDumper
+        noalias_dumper.ignore_aliases = lambda self, data: True
         for rulename, rule in self.elastalert_alerts.items():
-            result += yaml.dump(rule, default_flow_style=False)
+            result += yaml.dump(rule, default_flow_style=False, Dumper=noalias_dumper)
             result += '\n'
         return result
