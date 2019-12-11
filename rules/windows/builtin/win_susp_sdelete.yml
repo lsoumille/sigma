@@ -1,4 +1,5 @@
 title: Secure Deletion with SDelete
+id: 39a80702-d7ca-4a83-b776-525b1f86a36d
 status: experimental
 description: Detects renaming of file while deletion with SDelete tool
 author: Thomas Patzke
@@ -9,7 +10,7 @@ references:
 tags:
     - attack.defense_evasion
     - attack.t1107
-    - attack.t1116
+    - attack.t1066
     - attack.s0195
 logsource:
     product: windows

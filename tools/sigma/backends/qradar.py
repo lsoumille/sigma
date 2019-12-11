@@ -17,6 +17,8 @@
 
 import re
 import sigma
+from sigma.parser.modifiers.base import SigmaTypeModifier
+from sigma.parser.modifiers.type import SigmaRegularExpressionModifier
 from .base import SingleTextQueryBackend
 from .mixins import MultiRuleOutputMixin
 
@@ -25,6 +27,8 @@ class QRadarBackend(SingleTextQueryBackend):
     """Converts Sigma rule into Qradar saved search. Contributed by SOC Prime. https://socprime.com"""
     identifier = "qradar"
     active = True
+    config_required = False
+    default_config = ["sysmon", "qradar"]
     reEscape = re.compile('(")')
     reClear = None
     andToken = " and "
@@ -42,11 +46,17 @@ class QRadarBackend(SingleTextQueryBackend):
     aql_database = "events"
 
     def cleanKey(self, key):
+        if key == None:
+            return ""
         if " " in key:
             key = "\"%s\"" % (key)
             return key
         else:
             return key
+
+    def cleanValue(self, value):
+        """Remove quotes in text"""
+        return value.replace("\'","\\\'")
 
     def generateNode(self, node):
         if type(node) == sigma.parser.condition.ConditionAND:
@@ -83,6 +93,10 @@ class QRadarBackend(SingleTextQueryBackend):
                 return self.mapExpression % (self.cleanKey(key), self.generateNode(value))
         elif type(value) == list:
             return self.generateMapItemListNode(key, value)
+        elif isinstance(value, SigmaTypeModifier):
+            return self.generateMapItemTypedNode(key, value)
+        elif value is None:
+            return self.nullExpression % (key, )
         else:
             raise TypeError("Backend does not support map values of type " + str(type(value)))
 
@@ -96,6 +110,18 @@ class QRadarBackend(SingleTextQueryBackend):
                 itemslist.append('%s = %s' % (self.cleanKey(key), self.generateValueNode(item, True)))
         return '('+" or ".join(itemslist)+')'
 
+    def generateMapItemTypedNode(self, fieldname, value):
+        if type(value) == SigmaRegularExpressionModifier:
+            regex = str(value)
+            # Regular Expressions have to match the full value in QRadar
+            if not (regex.startswith('^') or regex.startswith('.*')):
+                regex = '.*' + regex
+            if not (regex.endswith('$') or regex.endswith('.*')):
+                regex = regex + '.*'
+            return "%s imatches %s" % (self.cleanKey(fieldname), self.generateValueNode(regex, True))
+        else:
+            raise NotImplementedError("Type modifier '{}' is not supported by backend".format(node.identifier))
+
     def generateValueNode(self, node, keypresent):
         if keypresent == False:
             return "UTF8(payload) ilike \'{0}{1}{2}\'".format("%", self.cleanValue(str(node)), "%")
@@ -108,19 +134,44 @@ class QRadarBackend(SingleTextQueryBackend):
     def generateNotNULLValueNode(self, node):
         return self.notNullExpression % (node.item)
 
-    def generateAggregation(self, agg):
+    def generateAggregation(self, agg, timeframe='00'):
         if agg == None:
             return ""
         if agg.aggfunc == sigma.parser.condition.SigmaAggregationParser.AGGFUNC_NEAR:
             raise NotImplementedError("The 'near' aggregation operator is not yet implemented for this backend")
         if agg.groupfield == None:
-            self.qradarPrefixAgg = "SELECT %s(%s) as agg_val from %s where" % (agg.aggfunc_notrans, agg.aggfield, self.aql_database)
-            self.qradarSuffixAgg = " group by %s having agg_val %s %s" % (agg.aggfield, agg.cond_op, agg.condition)
+            self.qradarPrefixAgg = "SELECT %s(%s) as agg_val from %s where" % (agg.aggfunc_notrans, self.cleanKey(agg.aggfield), self.aql_database)
+            self.qradarSuffixAgg = " group by %s having agg_val %s %s" % (self.cleanKey(agg.aggfield), agg.cond_op, agg.condition)
             return self.qradarPrefixAgg, self.qradarSuffixAgg
+        elif agg.groupfield != None and timeframe == '00':
+                self.qradarPrefixAgg = " SELECT %s(%s) as agg_val from %s where " % (agg.aggfunc_notrans, self.cleanKey(agg.aggfield), self.aql_database)
+                self.qradarSuffixAgg = " group by %s having agg_val %s %s" % (self.cleanKey(agg.groupfield), agg.cond_op, agg.condition)
+                return self.qradarPrefixAgg, self.qradarSuffixAgg
+        elif agg.groupfield != None and timeframe != None:
+            for key, duration in self.generateTimeframe(timeframe).items():
+                self.qradarPrefixAgg = " SELECT %s(%s) as agg_val from %s where " % (agg.aggfunc_notrans, self.cleanKey(agg.aggfield), self.aql_database)
+                self.qradarSuffixAgg = " group by %s having agg_val %s %s LAST %s %s" % (self.cleanKey(agg.groupfield), agg.cond_op, agg.condition, duration, key)
+                return self.qradarPrefixAgg, self.qradarSuffixAgg
         else:
-            self.qradarPrefixAgg = " SELECT %s(%s) as agg_val from %s where " % (agg.aggfunc_notrans, agg.aggfield, self.aql_database)
-            self.qradarSuffixAgg = " group by %s having agg_val %s %s" % (agg.groupfield, agg.cond_op, agg.condition)
+            self.qradarPrefixAgg = " SELECT %s(%s) as agg_val from %s where " % (agg.aggfunc_notrans, self.cleanKey(agg.aggfield), self.aql_database)
+            self.qradarSuffixAgg = " group by %s having agg_val %s %s" % (self.cleanKey(agg.groupfield), agg.cond_op, agg.condition)
             return self.qradarPrefixAgg, self.qradarSuffixAgg
+
+    def generateTimeframe(self, timeframe):
+        time_unit = timeframe[-1:]
+        duration = timeframe[:-1]
+        timeframe_object = {}
+        if time_unit == "s":
+            timeframe_object['seconds'] = int(duration)
+        elif time_unit == "m":
+            timeframe_object['minutes'] = int(duration)
+        elif time_unit == "h":
+            timeframe_object['hours'] = int(duration)
+        elif time_unit == "d":
+            timeframe_object['days'] = int(duration)
+        else:
+            timeframe_object['months'] = int(duration)
+        return timeframe_object
 
     def generate(self, sigmaparser):
         """Method is called for each sigma rule and receives the parsed rule (SigmaParser)"""
@@ -146,9 +197,31 @@ class QRadarBackend(SingleTextQueryBackend):
             aql_database = "flows"
         else:
             aql_database = "events"
-        qradarPrefix = "SELECT UTF8(payload) as search_payload from %s where " % (aql_database)
-        if parsed.parsedAgg:
+        
+        qradarPrefix="SELECT "
+        try:
+            mappedFields = []
+            for field in sigmaparser.parsedyaml["fields"]:
+                    mapped = sigmaparser.config.get_fieldmapping(field).resolve_fieldname(field, sigmaparser)
+                    mappedFields.append(mapped)
+            qradarPrefix += str(mappedFields).strip('[]')
+        except KeyError:    # no 'fields' attribute
+            mapped = None
+            qradarPrefix+="UTF8(payload) as search_payload"
+            pass
+        qradarPrefix += " from %s where " % (aql_database)
+
+        try:
+            timeframe = sigmaparser.parsedyaml['detection']['timeframe']
+        except:
+            timeframe = None
+
+        if parsed.parsedAgg and timeframe == None:
             (qradarPrefix, qradarSuffixAgg) = self.generateAggregation(parsed.parsedAgg)
+            result = qradarPrefix + result
+            result += qradarSuffixAgg
+        elif parsed.parsedAgg != None and timeframe != None:
+            (qradarPrefix, qradarSuffixAgg) = self.generateAggregation(parsed.parsedAgg, timeframe)
             result = qradarPrefix + result
             result += qradarSuffixAgg
         else:

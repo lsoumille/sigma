@@ -24,6 +24,8 @@ from .mixins import MultiRuleOutputMixin
 class NetWitnessBackend(SingleTextQueryBackend):
     """Converts Sigma rule into NetWitness saved search. Contributed by @tuckner"""
     identifier = "netwitness"
+    config_required = False
+    default_config = ["sysmon", "netwitness"]
     active = True
     reEscape = re.compile('(")')
     reClear = None
@@ -57,6 +59,8 @@ class NetWitnessBackend(SingleTextQueryBackend):
                 return self.mapExpression % (key, self.generateNode(value))
         elif type(value) == list:
             return self.generateMapItemListNode(key, value)
+        elif value is None:
+            return self.nullExpression % (key, )
         else:
             raise TypeError("Backend does not support map values of type " + str(type(value)))
 
@@ -71,6 +75,7 @@ class NetWitnessBackend(SingleTextQueryBackend):
                 item = re.sub('\\?', '.', item)
                 regexlist.append(self.generateValueNode(item))
             elif type(item) == str and (item.endswith("*") or item.startswith("*")):
+                item = re.sub('([".^$]|\\\\(?![*?]))', '\\\\\g<1>', item)
                 item = re.sub("(\*\\\\)|(\*)", "", item)
                 containlist.append(self.generateValueNode(item))
             else:
