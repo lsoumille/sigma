@@ -86,7 +86,7 @@ class ElasticsearchQuerystringBackend(ElasticsearchWildcardHandlingMixin, Single
     subExpression = "(%s)"
     listExpression = "(%s)"
     listSeparator = " OR "
-    valueExpression = "%s"
+    valueExpression = "(%s)"
     typedValueExpression = {
                 SigmaRegularExpressionModifier: "/%s/"
             }
@@ -100,10 +100,10 @@ class ElasticsearchQuerystringBackend(ElasticsearchWildcardHandlingMixin, Single
         if result == "" or result.isspace():
             return '""'
         else:
-            if self.matchKeyword:   # don't quote search value on keyword field
-                return result
-            else:
-                return "\"%s\"" % result
+            #if self.matchKeyword:   # don't quote search value on keyword field
+            return result
+            #else:
+            #    return "\"%s\"" % result
 
     def generateNOTNode(self, node):
         expression = super().generateNode(node.item)
